@@ -137,7 +137,7 @@ def test_track_flag_runs_only_the_requested_track(run_with_failures):
         "validate_shared_mappings",
         "ingest_inventory", "standardize_inventory", "add_inventory_products",
         "pseudonymize_inventory", "validate_inventory", "quality_gate_inventory",
-        "upload_inventory_s3",
+        "upload_inventory_s3", "load_snowflake_inventory",
     }
     assert stage_names_run == expected_stage_names
     assert set(report["track_status"].keys()) == {"shared", "inventory"}

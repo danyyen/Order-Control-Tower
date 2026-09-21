@@ -4,6 +4,11 @@ logs/
 *.csv
 *.xlsx
 *.xlsm
+*.docx
+knowledge_notes.md
+knowledge_snowflake_raw_notes.md
+snowflake_dbt_connection_setup_knowledge.md
+snowflake_stepbystep_README.md
 *.json
 !requirements.txt
 

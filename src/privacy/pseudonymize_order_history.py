@@ -27,6 +27,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from config.paths import STANDARDIZED_DIR, METADATA_DIR, PSEUDONYMIZED_DIR
+from src.privacy.hash_utils import deterministic_pseudonym
 
 
 # ---------------------------------------------------------------------------
@@ -299,6 +300,32 @@ def main() -> int:
         orders_pseudo["full_sku_code"] = orders_pseudo["pseudo_full_sku_code"]
         orders_pseudo["first_half_sku_code"] = orders_pseudo["pseudo_first_half_sku_code"]
         orders_pseudo["unique_sku_code"] = orders_pseudo["pseudo_unique_sku_code"]
+
+        # purchase_order_number: deterministic hash, not a mapped pseudo
+        # identity like customer/product — see src/privacy/hash_utils.py.
+        # Same real PO always maps to the same pseudonym (same length as
+        # the original), so it still works as a dedup/join key
+        # (order_number + purchase_order_number + full_sku_code, per
+        # knowledge_snowflake_raw_notes.md) — though short PO numbers
+        # (this field runs 1-12 chars) carry real collision risk at
+        # short lengths; see the caveat in hash_utils.py. Not part of
+        # the actual adopted business key (company_code + order_number +
+        # unique_sku_code), so a collision here is a minor accuracy loss
+        # for operational tracking, not a broken join.
+        orders_pseudo["original_purchase_order_number_removed"] = True
+        orders_pseudo["purchase_order_number"] = orders_pseudo["purchase_order_number"].apply(deterministic_pseudonym)
+
+        # company_code: same deterministic-hash treatment, kept as a
+        # column (not dropped) because it's REQUIRED_COLUMNS in
+        # data_quality_gate.py and part of the Snowflake RAW dedup
+        # composite key (company_code + order_number + unique_sku_code,
+        # per knowledge_snowflake_raw_notes.md) — both keep working
+        # unchanged against the pseudonym. This field is short (2 chars,
+        # single distinct value observed) so collision risk is currently
+        # moot, but would need revisiting if the org gains more company
+        # codes — see the length-collision caveat in hash_utils.py.
+        orders_pseudo["original_company_code_removed"] = True
+        orders_pseudo["company_code"] = orders_pseudo["company_code"].apply(deterministic_pseudonym)
 
         # --- Row hash for incremental loading ---
         # Computed BEFORE the drop below, deliberately, so it still reflects

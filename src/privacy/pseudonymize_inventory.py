@@ -42,6 +42,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from config.paths import STANDARDIZED_DIR, METADATA_DIR, PSEUDONYMIZED_DIR
+from src.privacy.hash_utils import deterministic_pseudonym
 
 logging.basicConfig(
     level=logging.INFO,
@@ -243,6 +244,13 @@ def main() -> int:
         # additive enrichment, same convention as pseudonymize_open_orders.py.
         inv_pseudo["product_category"] = inv_pseudo["pseudo_category"]
         inv_pseudo["product_category_derived"] = True
+
+        # warehouse_code: same-length deterministic pseudonym, not a
+        # mapped pseudo identity (no cross-dataset lookup needed —
+        # inventory is the only source of this field) — see
+        # src/privacy/hash_utils.py.
+        inv_pseudo["original_warehouse_code_removed"] = True
+        inv_pseudo["warehouse_code"] = inv_pseudo["warehouse_code"].apply(deterministic_pseudonym)
 
         inv_pseudo = inv_pseudo.drop(columns=[
             "raw_sku",
