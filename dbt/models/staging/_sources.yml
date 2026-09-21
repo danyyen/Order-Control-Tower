@@ -1,0 +1,41 @@
+# The leading underscore for this sources.yml file is just a naming convention that helps distinguish this configuration file from SQL models.
+
+# The format version for this YAML properties file.
+# This is different from your project's version.
+version: 2
+
+# Sources describe existing tables that dbt will read.
+# Declaring them does not create, reload, or modify those tables.
+sources:
+  - name: order_intelligence_raw
+    description: >
+      Pseudonymized project data loaded from S3 into Snowflake
+      by our ingestion process.
+
+    # The actual location of the existing tables in Snowflake.
+    database: ORDER_INTELLIGENCE_DB
+    schema: RAW
+
+    tables:
+      # "name" is the label we use inside dbt.
+      # "identifier" is the actual Snowflake table name.
+      - name: order_history
+        identifier: ORDER_HISTORY
+        description: >
+          Historical completed-order records.
+          The source batch ID can differ from the pseudonymization
+          run ID recorded in the source filename.
+
+      - name: open_orders
+        identifier: OPEN_ORDERS
+        description: >
+          Point-in-time records of orders at the ready-to-pick stage.
+          Intermediate processing stages are not supplied.
+          Disappearance from this dataset does not prove completion.
+
+      - name: inventory
+        identifier: INVENTORY
+        description: >
+          Inventory records for each loaded snapshot date.
+          The verified July 10, 2026 file includes one Grand Total
+          row that will be excluded in the staging model.

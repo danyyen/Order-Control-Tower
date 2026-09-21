@@ -1,0 +1,243 @@
+version: 2
+
+models:
+  - name: stg_order_history
+    description: >
+      Order-history source records prepared for downstream analysis.
+      Grain: one record per row in the loaded source file.
+      All source records and quantity values are preserved.
+      Company, order number, and SKU do not uniquely identify records.
+      Whether repeated records represent revisions or separate lines
+      remains unresolved. Do not select a latest revision or aggregate
+      these records as independent demand without confirming that meaning.
+
+    columns:
+      # Business identifiers and source classifications.
+      - name: company_code
+        data_type: varchar
+        description: >
+          Pseudonymized company code supplied by the upstream pipeline.
+          Part of the company/order/product grouping, not unique alone.
+
+      - name: order_number
+        data_type: varchar
+        description: >
+          Source order number preserved as text.
+          Multiple records can belong to the same order.
+
+      - name: purchase_order_number
+        data_type: varchar
+        description: >
+          Pseudonymized purchase-order reference supplied upstream.
+
+      - name: customer_name
+        data_type: varchar
+        description: >
+          Pseudonymized customer label supplied upstream.
+          Retains the source column name; it is not the original customer name.
+
+      - name: full_sku_code
+        data_type: varchar
+        description: >
+          Pseudonymized full SKU code supplied upstream.
+          Its relationship to the other SKU fields requires documentation.
+
+      - name: first_half_sku_code
+        data_type: varchar
+        description: >
+          Pseudonymized SKU component supplied under this source field name.
+
+      - name: unique_sku_code
+        data_type: varchar
+        description: >
+          Pseudonymized SKU code supplied upstream.
+          Despite its name, it does not uniquely identify an order-history row.
+
+      - name: product_description
+        data_type: varchar
+        description: >
+          Replacement product description produced by privacy processing.
+
+      - name: product_category
+        data_type: varchar
+        description: >
+          Product category label supplied by the privacy-processed dataset.
+          Preserved without further recategorization.
+
+      - name: delivery_route
+        data_type: varchar
+        description: >
+          Source delivery-route code preserved as text.
+          Business definitions of the route codes are not yet documented.
+
+      - name: order_type
+        data_type: varchar
+        description: >
+          Source order-type code.
+          Allowed values and their meanings require confirmation.
+
+      - name: order_status
+        data_type: varchar
+        description: >
+          Source order-status code.
+          Status meanings require confirmation; history membership
+          does not establish that a record was fully shipped.
+
+      # Dates are already DATE values in the current RAW table.
+      - name: order_date
+        data_type: date
+        description: >
+          Source order date, already converted to DATE during the RAW refresh.
+          Preserved unchanged in staging.
+
+      - name: scheduled_ship_date
+        data_type: date
+        description: >
+          Source scheduled shipment date, preserved from the typed RAW column.
+
+      - name: shipped_date
+        data_type: date
+        description: >
+          Date supplied in the source shipped-date field.
+          Present even on some zero-shipped records, so it does not alone
+          prove that a shipment occurred.
+
+      # Measures remain unchanged until their semantics are confirmed.
+      - name: ordered_quantity
+        data_type: number(38,0)
+        description: >
+          Source ordered quantity preserved unchanged.
+          Its precise definition and units require confirmation.
+
+      - name: secondary_order_quantity
+        data_type: number(38,0)
+        description: >
+          Source secondary quantity preserved unchanged.
+          Its relationship to ordered and final quantity is unresolved.
+
+      - name: final_order_quantity
+        data_type: number(38,0)
+        description: >
+          Source final quantity preserved unchanged.
+          Its definition and units require confirmation.
+          This value does not establish which record is the latest revision.
+
+      - name: shipped_order_quantity
+        data_type: number(38,0)
+        description: >
+          Source shipped quantity preserved unchanged.
+          Units and revision behavior require confirmation.
+          Zero values are retained.
+
+      - name: quantity_short
+        data_type: number(38,0)
+        description: >
+          Source shortage quantity preserved unchanged.
+          Its calculation and revision behavior require confirmation.
+          It is not used as part of a business identifier.
+
+      - name: shipped_order_weight
+        data_type: number(18,4)
+        description: >
+          Source shipped weight preserved unchanged.
+          Weight units require confirmation.
+
+      - name: order_amount
+        data_type: number(18,4)
+        description: >
+          Source order amount preserved unchanged.
+          Currency, calculation, and business reliability require confirmation.
+          Not yet approved for revenue reporting.
+
+      # Flags report upstream processing; they do not independently prove privacy.
+      - name: original_product_description_removed
+        data_type: boolean
+        description: >
+          Upstream flag reporting removal of the original product description.
+
+      - name: original_product_category_removed
+        data_type: boolean
+        description: >
+          Upstream flag reporting removal of the original product category.
+
+      - name: original_customer_name_removed
+        data_type: boolean
+        description: >
+          Upstream flag reporting removal of the original customer name.
+
+      - name: original_sku_codes_removed
+        data_type: boolean
+        description: >
+          Upstream flag reporting removal of the original SKU codes.
+
+      - name: original_purchase_order_number_removed
+        data_type: boolean
+        description: >
+          Upstream flag reporting removal of the original purchase-order number.
+
+      - name: original_company_code_removed
+        data_type: boolean
+        description: >
+          Upstream flag reporting removal of the original company code.
+
+      # Processing history and traceability.
+      - name: batch_id
+        data_type: varchar
+        description: >
+          Original source ingestion batch identifier.
+          May differ from the later privacy-processing run in the filename.
+
+      - name: row_hash
+        data_type: varchar
+        description: >
+          Hash supplied by the upstream pipeline.
+          Not unique for every record and not treated as a business key.
+
+      - name: source_ingested_at
+        data_type: timestamp_ntz
+        description: >
+          Upstream ingestion timestamp, renamed from ingested_at_datetime.
+          Timezone information is not stored in this column.
+
+      - name: standardized_at
+        data_type: timestamp_ntz
+        description: >
+          Upstream standardization timestamp.
+          Timezone information is not stored in this column.
+
+      - name: pseudonymized_at
+        data_type: timestamp_ntz
+        description: >
+          Upstream privacy-processing timestamp.
+          This is not a business order-revision timestamp.
+
+      - name: source_filename
+        data_type: varchar
+        description: >
+          Source file path recorded by Snowflake.
+          Together with source_file_row_number, identifies a record
+          within the currently loaded file version.
+        data_tests:
+          - not_null
+
+      - name: source_file_row_number
+        data_type: number(38,0)
+        description: >
+          Record position within the source file.
+          Not a business line number or revision sequence.
+          Positions may change when a file is regenerated.
+        data_tests:
+          - not_null
+
+      - name: source_file_last_modified
+        data_type: timestamp_ntz
+        description: >
+          File last-modified timestamp recorded during loading.
+          Describes the source file, not a business-record update.
+
+      - name: snowflake_loaded_at
+        data_type: timestamp_ltz
+        description: >
+          Snowflake file-scan timestamp captured during loading,
+          renamed from ingested_at.
+          Displayed according to the Snowflake session timezone.

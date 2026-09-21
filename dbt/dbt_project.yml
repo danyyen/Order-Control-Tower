@@ -1,0 +1,40 @@
+# The name dbt uses to identify this code project.
+name: 'order_intelligence'
+
+# Your project's version, not the version of dbt installed.
+version: '1.0.0'
+
+# The configuration file format used by dbt.
+config-version: 2
+
+# Keep the profile supplied by the Studio starter project.
+# Your Snowflake credentials are configured in dbt's web settings.
+profile: 'default'
+
+# Folder locations, relative to this dbt_project.yml file.
+model-paths: ["models"]        # SQL models and their YAML descriptions.
+analysis-paths: ["analyses"]   # Saved analysis queries.
+test-paths: ["tests"]          # Custom SQL data tests.
+seed-paths: ["seeds"]          # Small CSV reference datasets.
+macro-paths: ["macros"]        # Reusable code.
+snapshot-paths: ["snapshots"]  # Definitions for tracking changes over time.
+
+# dbt clean removes these generated folders when you run that command.
+# It does not delete your Snowflake tables.
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Default settings for models belonging to this project.
+models:
+  # This name must match the project's name above.
+  order_intelligence:
+
+    # Build models as views unless an individual model overrides this.
+    # A view stores a query; Snowflake reads its underlying data when queried.
+    +materialized: view
+
+    # Keep the tutorial models available for reference, but disable them.
+    # This applies to files inside models/example/.
+    example:
+      +enabled: false
