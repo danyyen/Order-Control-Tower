@@ -34,6 +34,7 @@ REQUIRED_COLUMNS = [
     "customer_name",
     "product_description",
     "product_category",
+    "delivery_route_name",
     "row_hash",
     "pseudonymized_at",
 ]
@@ -95,6 +96,10 @@ def main() -> int:
         bad_products = df[~df["product_description"].astype(str).str.contains(" Product ", na=False)]
         if len(bad_products) > 0:
             raise ValueError(f"Non-pseudonymized product descriptions found: {len(bad_products):,}")
+
+        bad_routes = df[~df["delivery_route_name"].astype(str).str.startswith("Route RT-")]
+        if len(bad_routes) > 0:
+            raise ValueError(f"Non-pseudonymized delivery route names found: {len(bad_routes):,}")
 
         missing_hash = df["row_hash"].isna().sum()
         if missing_hash > 0:

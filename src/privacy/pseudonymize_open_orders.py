@@ -39,6 +39,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from config.paths import STANDARDIZED_DIR, METADATA_DIR, PSEUDONYMIZED_DIR
+from src.privacy.hash_utils import deterministic_pseudonym
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +62,7 @@ REQUIRED_ORDER_COLUMNS = [
     "source_customer_code",
     "ship_to_customer_code",
     "customer_name",
+    "delivery_route_name",
 ]
 
 REQUIRED_PRODUCT_MAPPING_COLUMNS = [
@@ -73,6 +75,11 @@ REQUIRED_PRODUCT_MAPPING_COLUMNS = [
 ]
 
 REQUIRED_CUSTOMER_MAPPING_COLUMNS = ["customer_hash_key", "pseudo_customer_name"]
+
+# delivery_route_name is open-orders-only (order history has no such
+# field) — see route_name_mapping_pipeline.py for why this exists and why
+# it doesn't need the shared-foundation/backfill machinery.
+REQUIRED_ROUTE_MAPPING_COLUMNS = ["delivery_route_name", "pseudo_delivery_route_name"]
 
 HASH_COLUMNS = [
     "company_code",
@@ -93,6 +100,7 @@ HASH_COLUMNS = [
     "estimated_order_weight",
     "shipped_order_weight",
     "delivery_route",
+    "delivery_route_name",
     "customer_requested_date",
     "revised_delivery_date",
     "order_amount",
@@ -167,6 +175,7 @@ def main() -> int:
 
     product_mapping_file = METADATA_DIR / "product_mapping_final.csv"
     customer_mapping_file = METADATA_DIR / "customer_mapping_final.csv"
+    route_mapping_file = METADATA_DIR / "route_name_mapping_final.csv"
 
     batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = PSEUDONYMIZED_DIR / f"open_orders_pseudonymized_{batch_id}.csv"
@@ -184,16 +193,22 @@ def main() -> int:
             raise FileNotFoundError(
                 f"{customer_mapping_file} not found. Run customer_mapping_pipeline.py first."
             )
+        if not route_mapping_file.exists():
+            raise FileNotFoundError(
+                f"{route_mapping_file} not found. Run route_name_mapping_pipeline.py first."
+            )
 
         orders = pd.read_csv(input_file)
         # product_mapping has no numeric columns - dtype=str avoids pandas
         # silently stripping leading zeros from numeric-looking SKU codes.
         product_mapping = pd.read_csv(product_mapping_file, dtype=str)
         customer_mapping = pd.read_csv(customer_mapping_file)
+        route_mapping = pd.read_csv(route_mapping_file, dtype=str)
 
         logger.info(f"Loaded open orders rows: {len(orders):,}")
         logger.info(f"Loaded product mapping rows: {len(product_mapping):,}")
         logger.info(f"Loaded customer mapping rows: {len(customer_mapping):,}")
+        logger.info(f"Loaded route name mapping rows: {len(route_mapping):,}")
         logger.info(f"Input file: {input_file}")
 
         if orders.empty:
@@ -202,18 +217,31 @@ def main() -> int:
             raise ValueError("product_mapping_final.csv has 0 rows.")
         if customer_mapping.empty:
             raise ValueError("customer_mapping_final.csv has 0 rows.")
+        if route_mapping.empty:
+            raise ValueError("route_name_mapping_final.csv has 0 rows.")
 
-        for df, label in [(orders, "open orders"), (product_mapping, "product mapping"), (customer_mapping, "customer mapping")]:
+        for df, label in [
+            (orders, "open orders"),
+            (product_mapping, "product mapping"),
+            (customer_mapping, "customer mapping"),
+            (route_mapping, "route name mapping"),
+        ]:
             clean_columns(df)
             check_duplicate_columns(df, label)
 
         check_required_columns(orders, REQUIRED_ORDER_COLUMNS, "open orders")
         check_required_columns(product_mapping, REQUIRED_PRODUCT_MAPPING_COLUMNS, "product_mapping_final.csv")
         check_required_columns(customer_mapping, REQUIRED_CUSTOMER_MAPPING_COLUMNS, "customer_mapping_final.csv")
+        check_required_columns(route_mapping, REQUIRED_ROUTE_MAPPING_COLUMNS, "route_name_mapping_final.csv")
         logger.info("Required column checks passed.")
 
         check_unique_key(product_mapping, "full_sku_code", "product_mapping_final.csv")
         check_unique_key(customer_mapping, "customer_hash_key", "customer_mapping_final.csv")
+        check_unique_key(route_mapping, "delivery_route_name", "route_name_mapping_final.csv")
+
+        # --- Clean route join key ---
+        orders["delivery_route_name"] = orders["delivery_route_name"].astype(str).str.strip()
+        route_mapping["delivery_route_name"] = route_mapping["delivery_route_name"].astype(str).str.strip()
 
         # --- Clean product join key ---
         orders["full_sku_code"] = orders["full_sku_code"].astype(str).str.strip()
@@ -299,6 +327,28 @@ def main() -> int:
             )
         logger.info("All customers successfully mapped.")
 
+        # --- Merge route name pseudonymization ---
+        orders_pseudo = orders_pseudo.merge(
+            route_mapping[["delivery_route_name", "pseudo_delivery_route_name"]],
+            on="delivery_route_name",
+            how="left",
+        )
+
+        unmapped_routes = (
+            orders_pseudo[orders_pseudo["pseudo_delivery_route_name"].isna()]["delivery_route_name"]
+            .drop_duplicates()
+            .tolist()
+        )
+        if unmapped_routes:
+            logger.error(f"Unmapped route names found: {unmapped_routes[:20]}")
+            logger.error(f"Total unmapped route names: {len(unmapped_routes):,}")
+            raise ValueError(
+                "Some delivery_route_name values in open orders are missing "
+                "from route_name_mapping_final.csv. Run "
+                "route_name_mapping_pipeline.py against this source first."
+            )
+        logger.info("All route names successfully mapped.")
+
         if len(orders_pseudo) != len(orders):
             raise ValueError(
                 f"Row count changed after joins. Original: {len(orders):,}, "
@@ -322,6 +372,30 @@ def main() -> int:
         # mapping, not a replacement of real data.
         orders_pseudo["product_category"] = orders_pseudo["pseudo_category"]
         orders_pseudo["product_category_derived"] = True
+
+        # delivery_route_name: real, meaningful pseudo route name from
+        # route_name_mapping_final.csv (e.g. "Route RT-000042"), same
+        # "Customer CUST-######" convention as customer_name — NOT the
+        # same-length random pseudonym used for purchase_order_number/
+        # company_code below, because free-text route names routinely
+        # embed a real customer name + city/province (e.g.
+        # "COSTCO - AIRDRIE (AB)") and deserve a proper mapped identity,
+        # not just an opaque scramble. delivery_route (the numeric code)
+        # is deliberately left unmasked — see docs/DECISIONS.md.
+        orders_pseudo["original_delivery_route_name_removed"] = True
+        orders_pseudo["delivery_route_name"] = orders_pseudo["pseudo_delivery_route_name"]
+
+        # purchase_order_number: same-length deterministic pseudonym,
+        # same convention and same rationale as pseudonymize_order_history.py
+        # (including its collision caveat for short PO numbers).
+        orders_pseudo["original_purchase_order_number_removed"] = True
+        orders_pseudo["purchase_order_number"] = orders_pseudo["purchase_order_number"].apply(deterministic_pseudonym)
+
+        # company_code: same treatment as order history, same rationale
+        # (REQUIRED_COLUMNS + Snowflake RAW dedup composite key both keep
+        # working unchanged against the pseudonym).
+        orders_pseudo["original_company_code_removed"] = True
+        orders_pseudo["company_code"] = orders_pseudo["company_code"].apply(deterministic_pseudonym)
 
         # --- Row hash (for future incremental loading, same convention as order history) ---
         # Computed BEFORE the final drop below, deliberately, so it still
@@ -353,6 +427,7 @@ def main() -> int:
             "pseudo_full_sku_code",
             "pseudo_first_half_sku_code",
             "pseudo_unique_sku_code",
+            "pseudo_delivery_route_name",
             "customer_business_key",
             "customer_hash_key",
             "source_customer_code",

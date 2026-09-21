@@ -129,6 +129,14 @@ STAGES: list[Stage] = [
         max_retries=3,
         timeout=UPLOAD_TIMEOUT,
     ),
+    Stage(
+        "load_snowflake_order_history",
+        "warehouse/load_order_history_to_snowflake.py",
+        track="order_history",
+        retryable=True,
+        max_retries=2,
+        timeout=UPLOAD_TIMEOUT,
+    ),
 
     # --- Open orders track. Depends only on the shared foundation above
     # (for the customer/product/SKU mappings) — independent of the order
@@ -137,6 +145,7 @@ STAGES: list[Stage] = [
     Stage("standardize_open_orders", "standardization/standardize_open_orders_columns.py", track="open_orders"),
     Stage("add_open_orders_products", "privacy/add_open_orders_only_products.py", track="open_orders"),
     Stage("add_open_orders_customers", "privacy/add_open_orders_only_customers.py", track="open_orders"),
+    Stage("map_route_names", "privacy/route_name_mapping_pipeline.py", track="open_orders"),
     Stage("pseudonymize_open_orders", "privacy/pseudonymize_open_orders.py", track="open_orders"),
     Stage("validate_open_orders", "privacy/validate_pseudonymize_open_orders.py", track="open_orders"),
     Stage("quality_gate_open_orders", "quality/data_quality_gate_open_orders.py", track="open_orders"),
@@ -146,6 +155,14 @@ STAGES: list[Stage] = [
         track="open_orders",
         retryable=True,
         max_retries=3,
+        timeout=UPLOAD_TIMEOUT,
+    ),
+    Stage(
+        "load_snowflake_open_orders",
+        "warehouse/load_open_orders_to_snowflake.py",
+        track="open_orders",
+        retryable=True,
+        max_retries=2,
         timeout=UPLOAD_TIMEOUT,
     ),
 
@@ -163,6 +180,14 @@ STAGES: list[Stage] = [
         track="inventory",
         retryable=True,
         max_retries=3,
+        timeout=UPLOAD_TIMEOUT,
+    ),
+    Stage(
+        "load_snowflake_inventory",
+        "warehouse/load_inventory_to_snowflake.py",
+        track="inventory",
+        retryable=True,
+        max_retries=2,
         timeout=UPLOAD_TIMEOUT,
     ),
 ]

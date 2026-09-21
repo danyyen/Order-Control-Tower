@@ -199,12 +199,14 @@ Every stage remains a standalone Python script. `run_pipeline.py` orchestrates t
 Worth being precise about what “pseudonymized” means here:
 
 - Customer names, product descriptions, and SKU codes are replaced with stable fake identifiers from the shared local mappings.
+- Open orders' `delivery_route_name` (free text that routinely embeds a real customer name and city/province, e.g. `"COSTCO - AIRDRIE (AB)"`) is replaced with a stable pseudo route name (`"Route RT-000042"`) from its own local mapping (`data/metadata/route_name_mapping_final.csv`, built by `route_name_mapping_pipeline.py`). This field is open-orders-only — order history has no equivalent. `delivery_route` (the numeric code) is left unmasked, deliberately — see `docs/DECISIONS.md`.
 - `source_customer_code`, `ship_to_customer_code`, mapping helper columns, and employee usernames are removed before final order outputs are written.
 - Inventory's raw SKU is removed before its final output is written.
-- `company_code` remains as a non-personal operational field required by the current output contract and quality gates.
+- `company_code` remains present (required by the current output contract and quality gates, and part of the Snowflake RAW dedup composite key), but the literal value is replaced with a same-length deterministic pseudonym before upload, same treatment as `purchase_order_number` and `warehouse_code`.
 - The mapping files contain the relationship between real and pseudo identities. They remain local, are excluded from Git, and are never uploaded to S3.
 - This is pseudonymization, not anonymization. Dates, routes, quantities, amounts, order numbers, warehouse positions, and other operational context can still be sensitive.
-- Order number and purchase order number remain unchanged because they serve as operational transaction identifiers in this environment. A different privacy policy may require pseudonymizing them too.
+- `order_number` remains unchanged; it serves as an operational transaction identifier in this environment.
+- `purchase_order_number` (order history, open orders) and `warehouse_code` (inventory) are replaced with a same-length deterministic pseudonym (`deterministic_pseudonym()` in `src/privacy/hash_utils.py`) rather than a mapped pseudo identity — same real value always maps to the same pseudonym, so dedup/join logic that depends on it (e.g. the Snowflake RAW composite keys) still works, and the output is the same length as the original rather than a fixed 64-char hash. Short values (roughly 4 characters or fewer) carry real collision risk at this length — see the caveat in `hash_utils.py`.
 
 
 ## Quality gates
@@ -261,6 +263,14 @@ $env:S3_BUCKET = "your-bucket-name"
 $env:S3_PREFIX = "order-intelligence"   # optional; this is the default
 $env:AWS_REGION = "us-east-1"            # optional; this is the default
 ```
+
+**Environment variable** required by the pseudonymization stages:
+
+```powershell
+$env:PSEUDONYMIZATION_SALT = "<a long random value>"
+```
+
+Used by `src/privacy/hash_utils.py` to hash `purchase_order_number`, `company_code`, and (inventory) `warehouse_code` before any pseudonymized file is written. Set it once and keep it stable — changing it changes every hash output, breaking continuity with previously landed data. Not committed to git; store it the same way you'd store any other secret (local env var, secrets manager, etc.).
 
 **Common commands:**
 
