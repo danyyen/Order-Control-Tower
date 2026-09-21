@@ -5,11 +5,12 @@ logs/
 *.xlsx
 *.xlsm
 *.docx
+snowF_dbt_connection_setup_knowledge_note.md
 knowledge_notes.md
 knowledge_snowflake_raw_notes.md
 order_history_refresh_notes.md
 snowflake_stepbystep_README.md
-snowflake_dbt_connection_setup_knowledge_note.md
+dbt_project_setup_to_snowflake_tables_sources_notes.md
 *.json
 !requirements.txt
 
