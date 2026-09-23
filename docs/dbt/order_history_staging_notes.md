@@ -1,93 +1,41 @@
-# Order-history staging decisions and business questions
-
-## Current model purpose
-
-`stg_order_history` prepares order-history source records for
-downstream dbt models while preserving the source-file grain.
-
-Although the source is named order history, membership in this dataset
-does not by itself prove that every record was completely shipped.
-Some records contain zero shipped quantity and non-zero shortage.
+# Order-history staging decisions
 
 ## Grain
 
-Current staging grain:
+`stg_order_history` preserves one record per row in the loaded
+order-history source file.
 
-> One record per row in the loaded order-history source file.
-
-Technical source-record identity:
+The technical source-record identifier is:
 
 - `source_filename`
 - `source_file_row_number`
 
-This combination is populated and unique across the current 554,580
-records.
+Company code, order number, and unique SKU are useful for grouping,
+but do not uniquely identify every source record.
 
-It identifies a record within the currently loaded file version. It is
-not a permanent business order-line identifier because file row numbers
-can change if a file is regenerated.
+## Order amount decision
 
-## Business-key investigation
+`RAW.ORDER_HISTORY.ORDER_AMOUNT` is retained in RAW for auditability
+and source traceability.
 
-The closest business grouping investigated was:
+It is intentionally excluded from `stg_order_history` because the
+values do not represent reliable business facts. The field must not
+be used for revenue, sales, margin, or financial reporting.
 
-- `company_code`
-- `order_number`
-- `unique_sku_code`
+The staging model does not replace these values with zero or null.
+The field is omitted so downstream users cannot mistake it for an
+approved measure.
 
-This combination is not unique:
+## Requirements before reintroducing order amount
 
-- 12 combinations appear twice.
-- Those groups contain 24 source records.
-- Eleven pairs differ in quantities, weights, amounts, or hashes.
-- One pair matches in all inspected business fields and row hash but
-  has different source-file row numbers.
+Before an order-amount measure can be exposed downstream, confirm:
 
-The identical pair is:
+1. The authoritative source of the amount.
+2. Whether it represents line amount or complete order amount.
+3. Its currency.
+4. Whether it includes tax, discounts, freight, or adjustments.
+5. Whether repeated order-history records would duplicate the amount.
+6. How the amount reconciles with an approved financial source.
 
-- Company: `zn`
-- Order number: `42458`
-- SKU: `SKU-BASE-00464`
-- Source-file rows: `202134` and `202135`
-
-The repeated records may represent revisions, fulfillment records,
-separate source lines, or another source-system behavior. The current
-data does not establish which explanation is correct.
-
-## Confirmed staging decisions
-
-- Preserve all 554,580 source records.
-- Preserve all quantity fields without recalculation.
-- Preserve shipped weight and order amount without recalculation.
-- Preserve privacy-processing flags.
-- Preserve file metadata and pipeline timestamps.
-- Retain `row_hash` for traceability without treating it as unique.
-- Rename `ingested_at_datetime` to `source_ingested_at`.
-- Rename Snowflake `ingested_at` to `snowflake_loaded_at`.
-- Materialize the staging model as a view.
-- Do not deduplicate repeated company, order, and SKU combinations.
-- Do not select a presumed latest revision.
-- Do not aggregate repeated records in staging.
-
-## Date handling
-
-The current RAW order-history table already contains these fields as
-Snowflake DATE values:
-
-- `order_date`
-- `scheduled_ship_date`
-- `shipped_date`
-
-They were converted during the earlier manual RAW refresh and are
-preserved unchanged by `stg_order_history`.
-
-This differs from the preferred architecture in which RAW preserves the
-source representation and dbt staging performs type conversion. Future
-loads should follow one documented contract consistently.
-
-## Batch and processing-time distinction
-
-The current records contain source batch:
-
-```text
-20260715_181006
+A future trusted amount should be introduced through a reviewed
+business rule and reconciliation test.
