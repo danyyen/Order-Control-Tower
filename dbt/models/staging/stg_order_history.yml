@@ -6,10 +6,12 @@ models:
       Order-history source records prepared for downstream analysis.
       Grain: one record per row in the loaded source file.
       All source records and quantity values are preserved.
+      The source order_amount field is intentionally excluded because
+      its values do not represent reliable business facts.
       Company, order number, and SKU do not uniquely identify records.
       Whether repeated records represent revisions or separate lines
-      remains unresolved. Do not select a latest revision or aggregate
-      these records as independent demand without confirming that meaning.
+      remains unresolved. The source order_amount field is intentionally 
+      excluded because its values do not represent reliable business facts.
 
     columns:
       # Business identifiers and source classifications.
@@ -141,13 +143,6 @@ models:
         description: >
           Source shipped weight preserved unchanged.
           Weight units require confirmation.
-
-      - name: order_amount
-        data_type: number(18,4)
-        description: >
-          Source order amount preserved unchanged.
-          Currency, calculation, and business reliability require confirmation.
-          Not yet approved for revenue reporting.
 
       # Flags report upstream processing; they do not independently prove privacy.
       - name: original_product_description_removed

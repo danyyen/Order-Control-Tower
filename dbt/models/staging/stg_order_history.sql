@@ -13,6 +13,11 @@ Known limitation:
     Company + order + SKU is not unique.
     The meaning of repeated records and quantity revisions is
     still being investigated, so every source record is preserved.
+
+Excluded field:
+    order_amount is retained in RAW for source traceability but is
+    excluded from staging because its values do not represent
+    reliable business facts and must not be used as revenue.    
 */
 
 select
@@ -52,7 +57,7 @@ select
 
     -- Preserve source measures without assuming units or currency.
     shipped_order_weight,
-    order_amount,
+    
 
     -- Privacy-processing flags reported by the upstream pipeline.
     -- These flags record processing outcomes; they are not identifiers.
