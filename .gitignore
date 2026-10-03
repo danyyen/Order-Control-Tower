@@ -1,0 +1,70 @@
+﻿
+data/
+logs/
+*.csv
+*.xlsx
+*.xlsm
+*.docx
+snowF_dbt_connection_setup_knowledge_note.md
+knowledge_notes.md
+knowledge_snowflake_raw_notes.md
+order_history_refresh_notes.md
+snowflake_stepbystep_README.md
+dbt_project_setup_to_snowflake_tables_sources_notes.md
+*.json
+!requirements.txt
+
+# CREDENTIALS / SECRETS
+.env
+.aws/
+*.pem
+*.key
+credentials
+config/secrets.py
+config/local_overrides.py
+
+# PYTHON
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# JUPYTER
+.ipynb_checkpoints/
+
+# EDITORS / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# MISC
+*.tmp
+*.bak
+*.ipynb
+
+# Default .gitignore content added by dbt Cloud# you shouldn't commit these into source control
+# these are the default directory names, adjust/add to fit your needs
+target/
+dbt_packages/
+logs/
+# end dbt Cloud content
+
+# Default .gitignore content added by dbt Cloud# you shouldn't commit these into source control
+# these are the default directory names, adjust/add to fit your needs
+target/
+dbt_packages/
+logs/
+# end dbt Cloud content
