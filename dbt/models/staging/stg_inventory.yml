@@ -1,0 +1,173 @@
+version: 2
+
+models:
+  - name: stg_inventory
+    description: >
+      Point-in-time inventory observations for one warehouse.
+      Grain: one record per snapshot_date, warehouse_code, and
+      pallet_number. Historical weekly snapshots are preserved.
+      Quantity on hand includes reservations. Absence from a later
+      snapshot means the record is absent from that extract; it
+      does not establish why the inventory left.
+      Source summary rows without a pallet number are excluded.
+      Every retained stock record must have a pallet number.
+
+    columns:
+      - name: snapshot_date
+        data_type: date
+        description: >
+          Inventory observation date, converted from numeric YYYYMMDD.
+          This is the source snapshot date, not the warehouse load date.
+        data_tests:
+          - not_null
+
+      - name: warehouse_code
+        data_type: varchar
+        description: >
+          Stable pseudonymized identifier for the warehouse covered
+          by the export.
+        data_tests:
+          - not_null
+
+      - name: pallet_number
+        data_type: varchar
+        description: >
+          Pallet identifier converted from numeric storage to text,
+          removing decimal formatting. Leading zeros already lost
+          upstream cannot be recovered by this conversion.
+          Identifies a stock position within a warehouse snapshot.
+        data_tests:
+          - not_null
+
+      - name: full_sku_code
+        data_type: varchar
+        description: >
+          Stable pseudonymized product SKU shared with the order
+          datasets. A product need not appear in those datasets.
+        data_tests:
+          - not_null
+
+      - name: product_description
+        data_type: varchar
+        description: Pseudonymized product description supplied upstream.
+        data_tests:
+          - not_null
+
+      - name: product_category
+        data_type: varchar
+        description: >
+          Category supplied by the shared product mapping.
+          Products without a trustworthy source category use
+          the upstream Unknown Category bucket.
+
+      - name: product_category_derived
+        data_type: boolean
+        description: >
+          Upstream flag indicating that product_category was added
+          from the shared mapping rather than supplied by inventory.
+
+      - name: lot_number
+        data_type: varchar
+        description: Source lot identifier preserved from RAW.
+
+      - name: slot_location
+        data_type: varchar
+        description: Source warehouse storage-location identifier.
+
+      - name: pallet_held_flag
+        data_type: boolean
+        description: >
+          Source flag indicating whether the pallet is held.
+          Its effect on pick eligibility requires confirmation.
+
+      - name: production_date
+        data_type: date
+        description: >
+          Production date converted from numeric YYYYMMDD.
+          Missing or invalid calendar dates become null.
+
+      - name: best_before_date
+        data_type: date
+        description: >
+          Best-before date converted from numeric YYYYMMDD.
+          Missing or invalid calendar dates become null.
+
+      - name: reserved_quantity
+        description: >
+          Quantity reserved for a particular customer, preserved
+          unchanged from RAW. The customer is not identified in
+          this extract. Unit of measure requires confirmation.
+
+      - name: quantity_on_hand
+        description: >
+          Total quantity on hand, including reserved quantity,
+          preserved unchanged from RAW.
+          Unit of measure requires confirmation.
+
+      - name: weight
+        description: >
+          Source inventory weight preserved unchanged from RAW.
+          Unit of measure requires confirmation.
+
+      - name: original_product_description_removed
+        data_type: boolean
+        description: >
+          Upstream privacy flag reporting replacement of the
+          original product description.
+
+      - name: original_sku_removed
+        data_type: boolean
+        description: >
+          Upstream privacy flag reporting removal of the raw SKU.
+
+      - name: original_warehouse_code_removed
+        data_type: boolean
+        description: >
+          Upstream privacy flag reporting replacement of the
+          original warehouse code.
+
+      - name: row_hash
+        data_type: varchar
+        description: >
+          Upstream fingerprint of selected fields retained for
+          traceability. It is not the pallet or snapshot key.
+        data_tests:
+          - not_null
+
+      - name: pseudonymized_at
+        data_type: timestamp_ntz
+        description: >
+          Upstream privacy-processing timestamp.
+          It is not the inventory observation time.
+
+      - name: source_filename
+        data_type: varchar
+        description: >
+          S3 source-file path recorded by Snowflake.
+          Together with source_file_row_number, identifies a
+          record within the currently loaded file version.
+        data_tests:
+          - not_null
+
+      - name: source_file_row_number
+        data_type: number(38,0)
+        description: >
+          Physical record position within the source file.
+          It is not a permanent business identifier.
+        data_tests:
+          - not_null
+
+      - name: source_file_last_modified
+        data_type: timestamp_ntz
+        description: >
+          Source object's last-modified timestamp recorded during
+          loading. It is not the inventory snapshot time.
+        data_tests:
+          - not_null
+
+      - name: snowflake_loaded_at
+        data_type: timestamp_ltz
+        description: >
+          Snowflake file-scan timestamp, renamed from ingested_at.
+        data_tests:
+          - not_null

@@ -36,6 +36,13 @@ sources:
       - name: inventory
         identifier: INVENTORY
         description: >
-          Inventory records for each loaded snapshot date.
-          Source files can include a Grand Total row, which the
-          staging model will exclude.
+          Point-in-time inventory observations for one warehouse.
+          RAW preserves all loaded records, including a Grand Total
+          row when supplied. Inventory staging excludes rows without
+          pallet numbers under the observed summary-row rule.
+          Files may contain zero or one summary row. Tests flag
+          multiple missing-pallet rows or departures from the
+          observed summary pattern. All retained stock records
+          require a pallet number, and historical snapshots are preserved.
+          
+          
