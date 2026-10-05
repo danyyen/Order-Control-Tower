@@ -117,6 +117,8 @@ No source data is included in this repository. Automated tests create temporary 
 
 *Quality-approved pseudonymized datasets landed in Amazon S3.*
 
+![Terminal result](docs/images/status.jpg)
+
 More screenshots, including the stage status table, are available in [docs/images](docs/images).
 
 ## Architecture
